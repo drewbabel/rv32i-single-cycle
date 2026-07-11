@@ -1,0 +1,13 @@
+[options]
+mode bmc
+depth 1
+
+[engines]
+smtbmc
+
+[script]
+read -formal alu_formal.v
+prep -top alu_formal
+
+[files]
+build/alu_formal.v
