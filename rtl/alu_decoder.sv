@@ -18,7 +18,7 @@ module alu_decoder
   always_comb begin
     case (alu_op)
       AluOpAdd:    alu_ctrl = ALU_ADD;
-      AluOpBranch: alu_ctrl = ALU_SUB;  // zero/lt/ltu drive the branch mux
+      AluOpBranch: alu_ctrl = ALU_SUB;
 
       AluOpFunct: begin
         case (funct3)

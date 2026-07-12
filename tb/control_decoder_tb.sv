@@ -6,6 +6,8 @@ module control_decoder_tb ();
   logic [6:0] op;
   logic       reg_write;
   logic [2:0] imm_src;
+  logic [1:0] alu_a_src;
+  logic       pc_target_src;
   logic       alu_src;
   logic       mem_write;
   logic [1:0] result_src;
@@ -29,6 +31,10 @@ module control_decoder_tb ();
   localparam logic [2:0] ImmU = 3'd3;
   localparam logic [2:0] ImmJ = 3'd4;
 
+  localparam logic [1:0] SrcARs1 = 2'd0;
+  localparam logic [1:0] SrcAPc = 2'd1;
+  localparam logic [1:0] SrcAZero = 2'd2;
+
   localparam logic [1:0] ResAlu = 2'd0;
   localparam logic [1:0] ResMem = 2'd1;
   localparam logic [1:0] ResPc4 = 2'd2;
@@ -41,6 +47,8 @@ module control_decoder_tb ();
       .op        (op),
       .reg_write (reg_write),
       .imm_src   (imm_src),
+      .alu_a_src (alu_a_src),
+      .pc_target_src(pc_target_src),
       .alu_src   (alu_src),
       .mem_write (mem_write),
       .result_src(result_src),
@@ -93,6 +101,8 @@ module control_decoder_tb ();
     check1("op branch", branch, 1'b0);
     check1("op jump", jump, 1'b0);
     check2("op alu_op", alu_op, AluFunct);
+    check2("op alu_a_src", alu_a_src, SrcARs1);
+    check1("op pc_target_src", pc_target_src, 1'b0);
 
     // I-type ALU
     op = OpcodeOpImm;
@@ -105,6 +115,8 @@ module control_decoder_tb ();
     check1("opimm branch", branch, 1'b0);
     check1("opimm jump", jump, 1'b0);
     check2("opimm alu_op", alu_op, AluFunct);
+    check2("opimm alu_a_src", alu_a_src, SrcARs1);
+    check1("opimm pc_target_src", pc_target_src, 1'b0);
 
     // Load
     op = OpcodeLoad;
@@ -117,6 +129,8 @@ module control_decoder_tb ();
     check1("load branch", branch, 1'b0);
     check1("load jump", jump, 1'b0);
     check2("load alu_op", alu_op, AluAdd);
+    check2("load alu_a_src", alu_a_src, SrcARs1);
+    check1("load pc_target_src", pc_target_src, 1'b0);
 
     // Store
     op = OpcodeStore;
@@ -128,6 +142,8 @@ module control_decoder_tb ();
     check1("store branch", branch, 1'b0);
     check1("store jump", jump, 1'b0);
     check2("store alu_op", alu_op, AluAdd);
+    check2("store alu_a_src", alu_a_src, SrcARs1);
+    check1("store pc_target_src", pc_target_src, 1'b0);
 
     // Branch
     op = OpcodeBranch;
@@ -139,6 +155,8 @@ module control_decoder_tb ();
     check1("branch branch", branch, 1'b1);
     check1("branch jump", jump, 1'b0);
     check2("branch alu_op", alu_op, AluBranch);
+    check2("branch alu_a_src", alu_a_src, SrcARs1);
+    check1("branch pc_target_src", pc_target_src, 1'b0);
 
     // jal
     op = OpcodeJal;
@@ -149,6 +167,8 @@ module control_decoder_tb ();
     check2("jal result_src", result_src, ResPc4);
     check1("jal branch", branch, 1'b0);
     check1("jal jump", jump, 1'b1);
+    check2("jal alu_a_src", alu_a_src, SrcARs1);
+    check1("jal pc_target_src", pc_target_src, 1'b0);
 
     // jalr
     op = OpcodeJalr;
@@ -161,6 +181,8 @@ module control_decoder_tb ();
     check1("jalr branch", branch, 1'b0);
     check1("jalr jump", jump, 1'b1);
     check2("jalr alu_op", alu_op, AluAdd);
+    check2("jalr alu_a_src", alu_a_src, SrcARs1);
+    check1("jalr pc_target_src", pc_target_src, 1'b1);
 
     // lui
     op = OpcodeLui;
@@ -173,6 +195,8 @@ module control_decoder_tb ();
     check1("lui branch", branch, 1'b0);
     check1("lui jump", jump, 1'b0);
     check2("lui alu_op", alu_op, AluAdd);
+    check2("lui alu_a_src", alu_a_src, SrcAZero);
+    check1("lui pc_target_src", pc_target_src, 1'b0);
 
     // auipc
     op = OpcodeAuipc;
@@ -185,6 +209,8 @@ module control_decoder_tb ();
     check1("auipc branch", branch, 1'b0);
     check1("auipc jump", jump, 1'b0);
     check2("auipc alu_op", alu_op, AluAdd);
+    check2("auipc alu_a_src", alu_a_src, SrcAPc);
+    check1("auipc pc_target_src", pc_target_src, 1'b0);
 
     // Illegal opcode
     op = 7'b1111111;

@@ -2,6 +2,8 @@ module control_decoder (
     input  logic [6:0] op,
     output logic       reg_write,
     output logic [2:0] imm_src,
+    output logic [1:0] alu_a_src,
+    output logic       pc_target_src,
     output logic       alu_src,
     output logic       mem_write,
     output logic [1:0] result_src,
@@ -28,6 +30,10 @@ module control_decoder (
   localparam logic [2:0] ImmU = 3'd3;
   localparam logic [2:0] ImmJ = 3'd4;
 
+  localparam logic [1:0] SrcARs1 = 2'd0;
+  localparam logic [1:0] SrcAPc = 2'd1;
+  localparam logic [1:0] SrcAZero = 2'd2;
+
   // result_src: 0=alu, 1=mem read, 2=pc+4
   localparam logic [1:0] ResAlu = 2'd0;
   localparam logic [1:0] ResMem = 2'd1;
@@ -41,6 +47,8 @@ module control_decoder (
   always_comb begin
     reg_write  = 1'b0;
     imm_src    = ImmI;
+    alu_a_src  = SrcARs1;
+    pc_target_src = 1'b0;
     alu_src    = 1'b0;
     mem_write  = 1'b0;
     result_src = ResAlu;
@@ -98,25 +106,30 @@ module control_decoder (
         result_src = ResPc4;
         jump       = 1'b1;
         alu_op     = AluOpAdd;  // alu computes rs1 + imm as the target
+        pc_target_src = 1'b1;  // pc target comes from the alu, not pc + imm
       end
 
       OpcodeLui: begin  // lui
         reg_write = 1'b1;
         imm_src   = ImmU;
+        alu_a_src = SrcAZero;
         alu_src   = 1'b1;
-        alu_op    = AluOpAdd;  // 0 + immU via the SrcA=0 mux
+        alu_op    = AluOpAdd;
       end
 
       OpcodeAuipc: begin  // auipc
         reg_write = 1'b1;
         imm_src   = ImmU;
+        alu_a_src = SrcAPc;
         alu_src   = 1'b1;
-        alu_op    = AluOpAdd;  // needs pc on the alu's a input
+        alu_op    = AluOpAdd;
       end
 
       default: begin
         reg_write  = 1'b0;
         imm_src    = 3'bxxx;
+        alu_a_src  = 2'bxx;
+        pc_target_src = 1'bx;
         alu_src    = 1'bx;
         mem_write  = 1'b0;
         result_src = 2'bxx;
