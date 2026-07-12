@@ -9,6 +9,7 @@
 RTL := $(wildcard rtl/alu_pkg.sv) $(filter-out rtl/alu_pkg.sv,$(wildcard rtl/*.sv))
 TB  := tb/$(MOD)_tb.sv
 SIM := build/sim
+VCD := $(MOD)_tb.vcd
 WAVE_STATE := tb/$(MOD).ron
 FORMAL := formal/$(MOD).sby
 
@@ -23,7 +24,7 @@ wave:
 	@mkdir -p build
 	iverilog -g2012 -s $(MOD)_tb -o $(SIM) $(RTL) $(TB)
 	-vvp $(SIM)
-	surfer $$(ls *.vcd 2>/dev/null | head -1) $$(test -f $(WAVE_STATE) && echo "-s $(WAVE_STATE)") &
+	surfer $(VCD) $$(test -f $(WAVE_STATE) && echo "-s $(WAVE_STATE)") &
 
 formal:
 	@test -n "$(MOD)" || { echo "usage: make formal MOD=<module>  (e.g. MOD=alu)"; exit 1; }
@@ -34,8 +35,8 @@ formal:
 view:
 	@test -n "$(MOD)" || { echo "usage: make view MOD=<module>"; exit 1; }
 	@test -f "tb/$(MOD).ron" || { echo "Error: tb/$(MOD).ron not found"; exit 1; }
-	@test -f "$$(ls *.vcd 2>/dev/null | head -1)" || { echo "Error: no .vcd found"; exit 1; }
-	surfer $$(ls *.vcd 2>/dev/null | head -1) -s tb/$(MOD).ron &
+	@test -f "$(VCD)" || { echo "Error: $(VCD) not found (run make MOD=$(MOD) first)"; exit 1; }
+	surfer $(VCD) -s tb/$(MOD).ron &
 
 view-formal:
 	@test -n "$(MOD)" || { echo "usage: make view-formal MOD=<module>  (e.g. MOD=alu)"; exit 1; }
