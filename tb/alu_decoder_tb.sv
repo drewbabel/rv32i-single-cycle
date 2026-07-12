@@ -10,6 +10,8 @@ module alu_decoder_tb
   logic       funct7b5;
   logic       op5;
   alu_pkg::alu_op_e alu_ctrl;
+  alu_pkg::alu_op_e exp;
+  alu_pkg::alu_op_e got;
 
   localparam logic [1:0] AluOpAdd = 2'b00;
   localparam logic [1:0] AluOpBranch = 2'b01;
@@ -23,13 +25,8 @@ module alu_decoder_tb
       .alu_ctrl(alu_ctrl)
   );
 
-  task automatic check(input string name, input alu_pkg::alu_op_e got, input alu_pkg::alu_op_e exp);
-    checks++;
-    if (got !== exp) begin
-      errors++;
-      $display("%s mismatch: got %s, exp %s", name, got.name(), exp.name());
-    end
-  endtask
+  // vector: {alu_op[1:0], funct3[2:0], funct7b5, op5, exp[3:0]}
+  logic [10:0] vectors[17];
 
   task automatic verdict();
     if (errors == 0) $display("PASS: %0d checks, %0d mismatches", checks, errors);
@@ -41,38 +38,41 @@ module alu_decoder_tb
     $dumpfile("alu_decoder_tb.vcd");
     $dumpvars(0, alu_decoder_tb);
 
-    // Add category
-    alu_op = AluOpAdd; funct3 = 3'b000; funct7b5 = 0; op5 = 0; #1;
-    check("add cat", alu_ctrl, ALU_ADD);
-    alu_op = AluOpAdd; funct3 = 3'b111; funct7b5 = 1; op5 = 1; #1;
-    check("add cat ignores funct", alu_ctrl, ALU_ADD);
+    vectors = '{
+      {AluOpAdd, 3'b000, 1'b0, 1'b0, ALU_ADD},     // add category
+      {AluOpAdd, 3'b111, 1'b1, 1'b1, ALU_ADD},     // add category ignores funct
+      {AluOpBranch, 3'b000, 1'b0, 1'b0, ALU_SUB},  // branch category
+      {AluOpFunct, 3'b000, 1'b0, 1'b1, ALU_ADD},   // add r
+      {AluOpFunct, 3'b000, 1'b1, 1'b1, ALU_SUB},   // sub r
+      {AluOpFunct, 3'b000, 1'b1, 1'b0, ALU_ADD},   // addi bit30 set stays add
+      {AluOpFunct, 3'b000, 1'b0, 1'b0, ALU_ADD},   // addi
+      {AluOpFunct, 3'b001, 1'b0, 1'b1, ALU_SLL},   // sll
+      {AluOpFunct, 3'b010, 1'b0, 1'b1, ALU_SLT},   // slt
+      {AluOpFunct, 3'b011, 1'b0, 1'b1, ALU_SLTU},  // sltu
+      {AluOpFunct, 3'b100, 1'b0, 1'b1, ALU_XOR},   // xor
+      {AluOpFunct, 3'b110, 1'b0, 1'b1, ALU_OR},    // or
+      {AluOpFunct, 3'b111, 1'b0, 1'b1, ALU_AND},   // and
+      {AluOpFunct, 3'b101, 1'b0, 1'b1, ALU_SRL},   // srl r
+      {AluOpFunct, 3'b101, 1'b1, 1'b1, ALU_SRA},   // sra r
+      {AluOpFunct, 3'b101, 1'b0, 1'b0, ALU_SRL},   // srli
+      {AluOpFunct, 3'b101, 1'b1, 1'b0, ALU_SRA}    // srai stays arithmetic
+    };
 
-    // Branch category
-    alu_op = AluOpBranch; funct3 = 3'b000; funct7b5 = 0; op5 = 0; #1;
-    check("branch cat", alu_ctrl, ALU_SUB);
-
-    // funct3=000 add/sub tiebreaker
-    alu_op = AluOpFunct; funct3 = 3'b000;
-    funct7b5 = 0; op5 = 1; #1; check("add (r)", alu_ctrl, ALU_ADD);
-    funct7b5 = 1; op5 = 1; #1; check("sub (r)", alu_ctrl, ALU_SUB);
-    funct7b5 = 1; op5 = 0; #1; check("addi bit30 set stays add", alu_ctrl, ALU_ADD);
-    funct7b5 = 0; op5 = 0; #1; check("addi", alu_ctrl, ALU_ADD);
-
-    // One-to-one funct3 arms
-    alu_op = AluOpFunct; funct7b5 = 0; op5 = 1;
-    funct3 = 3'b001; #1; check("sll", alu_ctrl, ALU_SLL);
-    funct3 = 3'b010; #1; check("slt", alu_ctrl, ALU_SLT);
-    funct3 = 3'b011; #1; check("sltu", alu_ctrl, ALU_SLTU);
-    funct3 = 3'b100; #1; check("xor", alu_ctrl, ALU_XOR);
-    funct3 = 3'b110; #1; check("or", alu_ctrl, ALU_OR);
-    funct3 = 3'b111; #1; check("and", alu_ctrl, ALU_AND);
-
-    // funct3=101 srl/sra tiebreaker, no op5 gate
-    alu_op = AluOpFunct; funct3 = 3'b101;
-    funct7b5 = 0; op5 = 1; #1; check("srl (r)", alu_ctrl, ALU_SRL);
-    funct7b5 = 1; op5 = 1; #1; check("sra (r)", alu_ctrl, ALU_SRA);
-    funct7b5 = 0; op5 = 0; #1; check("srli", alu_ctrl, ALU_SRL);
-    funct7b5 = 1; op5 = 0; #1; check("srai stays arithmetic", alu_ctrl, ALU_SRA);
+    foreach (vectors[i]) begin
+      alu_op   = vectors[i][10:9];
+      funct3   = vectors[i][8:6];
+      funct7b5 = vectors[i][5];
+      op5      = vectors[i][4];
+      exp      = alu_pkg::alu_op_e'(vectors[i][3:0]);
+      #1;
+      got = alu_ctrl;
+      checks++;
+      if (got !== exp) begin
+        errors++;
+        $display("vec %0d (alu_op=%b funct3=%b f7=%b o5=%b): got %s exp %s",
+                 i, alu_op, funct3, funct7b5, op5, got.name(), exp.name());
+      end
+    end
 
     verdict();
   end
