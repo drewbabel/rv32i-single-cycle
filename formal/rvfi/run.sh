@@ -26,4 +26,4 @@ sv2v -D RISCV_FORMAL "${SRC[@]}" > "$DST/$CORE.v"
 
 cd "$DST"
 python3 "$RVF/checks/genchecks.py"
-make -C checks
+make -j"$(getconf _NPROCESSORS_ONLN)" -C checks
