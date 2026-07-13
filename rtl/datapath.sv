@@ -21,6 +21,11 @@ module datapath
     output logic                        zero,
     output logic                        lt,
     output logic                        ltu
+`ifdef RISCV_FORMAL
+    ,
+    output logic             [XLEN-1:0] dbg_rs1_data,
+    output logic             [XLEN-1:0] dbg_rd_wdata
+`endif
 );
 
   logic [XLEN-1:0] pc_next;  // pc_src mux output -> pc.pc_next
@@ -104,5 +109,10 @@ module datapath
     pc_target = (pc_target_src) ? alu_result : pc + imm_ext;
     pc_next   = (pc_src) ? pc_target : pc_plus4;
   end
+
+`ifdef RISCV_FORMAL
+  assign dbg_rs1_data = rs1_data;
+  assign dbg_rd_wdata = result;
+`endif
 
 endmodule

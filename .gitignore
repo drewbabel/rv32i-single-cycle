@@ -6,6 +6,7 @@ build/
 
 # SymbiYosys work directories
 formal/*/
+!formal/rvfi/
 
 # cocotb
 sim_build/

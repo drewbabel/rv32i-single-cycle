@@ -13,6 +13,12 @@ module riscv_single
     output logic [XLEN-1:0] write_data,
     output logic      [3:0] store_wstrb,
     output logic [XLEN-1:0] store_data
+`ifdef RISCV_FORMAL
+    ,
+    output logic [XLEN-1:0] dbg_rs1_data,
+    output logic [XLEN-1:0] dbg_rd_wdata,
+    output logic            dbg_reg_write
+`endif
 );
 
   // control_unit to datapath wiring
@@ -68,6 +74,11 @@ module riscv_single
       .zero         (zero),
       .lt           (lt),
       .ltu          (ltu)
+`ifdef RISCV_FORMAL
+      ,
+      .dbg_rs1_data (dbg_rs1_data),
+      .dbg_rd_wdata (dbg_rd_wdata)
+`endif
   );
 
   always_comb begin
@@ -104,5 +115,9 @@ module riscv_single
       endcase
     end
   end
+
+`ifdef RISCV_FORMAL
+  assign dbg_reg_write = reg_write;
+`endif
 
 endmodule
