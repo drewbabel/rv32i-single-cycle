@@ -12,6 +12,7 @@ BASE = 0x8000_0000  # Spike DRAM base
 DEPTH = 64
 MASK32 = 0xFFFF_FFFF
 ABS_PC_OPS = {0x17, 0x6F, 0x67}  # auipc jal jalr
+STORE_WIDTH = {0: 1, 1: 2, 2: 4}  # store funct3 to byte count
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BUILD = os.path.join(ROOT, "build")
@@ -50,15 +51,18 @@ def run_dut(dut_hex):
                          cwd=ROOT, capture_output=True, text=True).stdout
     trace = []
     for line in out.splitlines():
-        m = re.match(r"COMMIT ([0-9a-f]+) (\d+) ([0-9a-f]+) (\d+) ([0-9a-f]+) ([0-9a-f]+)", line)
+        m = re.match(r"COMMIT ([0-9a-f]+) (\d+) ([0-9a-f]+) (\d+) ([0-9a-f]+) ([0-9a-f]+) ([0-9a-f]+)", line)
         if not m:
             continue
-        pc, rd, val, mw, maddr, mval = m.groups()
+        pc, rd, val, mw, maddr, wstrb, sdata = m.groups()
         rd_i = int(rd)
         val_i = (int(val, 16) & MASK32) if rd_i else 0  # x0 carries no value
-        st_word = (int(maddr, 16) >> 2) & (DEPTH - 1) if mw == "1" else None
-        st_val = int(mval, 16) & MASK32 if mw == "1" else None
-        trace.append((int(pc, 16), rd_i, val_i, st_word, st_val))
+        store = None
+        if mw == "1":  # written bytes, one entry per strobed lane
+            ws, sd = int(wstrb, 16), int(sdata, 16)
+            widx = (int(maddr, 16) >> 2) & (DEPTH - 1)
+            store = (widx, tuple((i, (sd >> (8 * i)) & 0xFF) for i in range(4) if ws & (1 << i)))
+        trace.append((int(pc, 16), rd_i, val_i, store))
     return trace
 
 
@@ -76,7 +80,8 @@ def run_spike(spike_elf, n):
         if not m:
             continue
         pc_raw, instr_hex, tail = m.groups()
-        opcode = int(instr_hex, 16) & 0x7F
+        insn = int(instr_hex, 16)
+        opcode = insn & 0x7F
         rd, val = 0, 0
         rm = re.search(r"(?:^|\s)x(\d+)\s+0x([0-9a-f]+)", tail)  # register write
         if rm:
@@ -84,23 +89,27 @@ def run_spike(spike_elf, n):
             val = int(rm.group(2), 16) & MASK32
             if opcode in ABS_PC_OPS and rd != 0:
                 val = (val - BASE) & MASK32  # to dut space
-        st_word, st_val = None, None
-        sm = re.search(r"mem\s+0x([0-9a-f]+)\s+0x([0-9a-f]+)", tail)  # store
+        store = None
+        sm = re.search(r"mem\s+0x([0-9a-f]+)\s+0x([0-9a-f]+)", tail)  # store logs addr + value
         if sm:
-            st_word = (int(sm.group(1), 16) >> 2) & (DEPTH - 1)
-            st_val = int(sm.group(2), 16) & MASK32
+            saddr, sval = int(sm.group(1), 16), int(sm.group(2), 16)
+            width = STORE_WIDTH[(insn >> 12) & 0x7]  # sb=1 sh=2 sw=4
+            off = saddr & 0x3
+            widx = (saddr >> 2) & (DEPTH - 1)
+            store = (widx, tuple((off + k, (sval >> (8 * k)) & 0xFF) for k in range(width)))
         pc = (int(pc_raw, 16) - BASE) & MASK32  # to dut space
-        trace.append((pc, rd if rd != 0 else 0, val, st_word, st_val))
+        trace.append((pc, rd if rd != 0 else 0, val, store))
         if len(trace) >= n:
             break
     return trace
 
 
 def fmt(rec):
-    pc, rd, val, sw, sv = rec
+    pc, rd, val, store = rec
     parts = [f"pc={pc:08x}", f"x{rd}={val:08x}" if rd else "x0"]
-    if sw is not None:
-        parts.append(f"mem[{sw}]={sv:08x}")
+    if store is not None:
+        widx, bs = store
+        parts.append(f"mem[w{widx}] " + " ".join(f"b{i}={b:02x}" for i, b in bs))
     return "  ".join(parts)
 
 
@@ -141,33 +150,49 @@ def gen(seed):
 
     for i in range(n):
         # no auipc or jal-link, they are base-dependent
+        # loads only in linear mode, control-flow jumps can skip the defining store
+        mem_st = ["stb", "sth"] if written else []
+        mem_ld = ["ldb", "ldh"] if written else []
         if mode == "linear":
-            pool = ["r", "i", "sh", "lui", "sw"] + (["lw"] if written else [])
+            pool = ["r", "i", "sh", "lui", "sw"] + (["lw"] if written else []) + mem_st + mem_ld
         else:
-            pool = ["r", "i", "sh", "lui", "sw", "branch", "jal"]
+            pool = ["r", "i", "sh", "lui", "sw", "branch", "jal"] + mem_st
         kind = rng.choice(pool)
 
-        if kind == "r":
-            body.append(f"{rng.choice(R_OPS)} x{rd()}, x{rs()}, x{rs()}")
-        elif kind == "i":
-            body.append(f"{rng.choice(I_OPS)} x{rd()}, x{rs()}, {rng.randint(-2048, 2047)}")
-        elif kind == "sh":
-            body.append(f"{rng.choice(SH_OPS)} x{rd()}, x{rs()}, {rng.randint(0, 31)}")
-        elif kind == "lui":
-            body.append(f"lui x{rd()}, {rng.randint(0, 0xFFFFF)}")
-        elif kind == "sw":
-            word = rng.randint(0, DEPTH - 1)
-            written.add(word)
-            body.append(f"sw x{rs()}, {word * 4}(x{BASE_REG})")
-        elif kind == "lw":  # only from written words
-            word = rng.choice(sorted(written))
-            body.append(f"lw x{rd()}, {word * 4}(x{BASE_REG})")
-        elif kind == "branch":  # forward target only
-            tgt = rng.choice([f"L{k}" for k in range(i + 1, n)] + ["Ldone"])
-            body.append(f"{rng.choice(BR_OPS)} x{rs()}, x{rs()}, {tgt}")
-        elif kind == "jal":  # forward jump, no link
-            tgt = rng.choice([f"L{k}" for k in range(i + 1, n)] + ["Ldone"])
-            body.append(f"jal x0, {tgt}")
+        match kind:
+            case "r":
+                body.append(f"{rng.choice(R_OPS)} x{rd()}, x{rs()}, x{rs()}")
+            case "i":
+                body.append(f"{rng.choice(I_OPS)} x{rd()}, x{rs()}, {rng.randint(-2048, 2047)}")
+            case "sh":
+                body.append(f"{rng.choice(SH_OPS)} x{rd()}, x{rs()}, {rng.randint(0, 31)}")
+            case "lui":
+                body.append(f"lui x{rd()}, {rng.randint(0, 0xFFFFF)}")
+            case "sw":
+                word = rng.randint(0, DEPTH - 1)
+                written.add(word)
+                body.append(f"sw x{rs()}, {word * 4}(x{BASE_REG})")
+            case "lw":
+                word = rng.choice(sorted(written))
+                body.append(f"lw x{rd()}, {word * 4}(x{BASE_REG})")
+            case "stb":
+                word = rng.choice(sorted(written))
+                body.append(f"sb x{rs()}, {word * 4 + rng.randint(0, 3)}(x{BASE_REG})")
+            case "sth":
+                word = rng.choice(sorted(written))
+                body.append(f"sh x{rs()}, {word * 4 + rng.choice([0, 2])}(x{BASE_REG})")
+            case "ldb":
+                word = rng.choice(sorted(written))
+                body.append(f"{rng.choice(['lb', 'lbu'])} x{rd()}, {word * 4 + rng.randint(0, 3)}(x{BASE_REG})")
+            case "ldh":
+                word = rng.choice(sorted(written))
+                body.append(f"{rng.choice(['lh', 'lhu'])} x{rd()}, {word * 4 + rng.choice([0, 2])}(x{BASE_REG})")
+            case "branch":
+                tgt = rng.choice([f"L{k}" for k in range(i + 1, n)] + ["Ldone"])
+                body.append(f"{rng.choice(BR_OPS)} x{rs()}, x{rs()}, {tgt}")
+            case "jal":
+                tgt = rng.choice([f"L{k}" for k in range(i + 1, n)] + ["Ldone"])
+                body.append(f"jal x0, {tgt}")
 
     # base 0x80008000 clears the code in Spike
     lines = ["        .section .text", "        .globl _start", "_start:",

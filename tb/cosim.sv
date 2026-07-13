@@ -47,9 +47,10 @@ module cosim ();
     instr = dut.instr;
     rd    = instr[11:7];
     rw    = dut.riscv_single_inst.reg_write;
-    // pc rd rd_val mem_write mem_addr mem_val
-    $display("COMMIT %08x %0d %08x %0d %08x %08x", pc, (rw && rd != 0) ? rd : 0,
-             dut.riscv_single_inst.datapath_inst.result, mem_write, alu_result, write_data);
+    // pc rd rd_val mem_write mem_addr wstrb store_data
+    $display("COMMIT %08x %0d %08x %0d %08x %1x %08x", pc, (rw && rd != 0) ? rd : 0,
+             dut.riscv_single_inst.datapath_inst.result, mem_write, alu_result,
+             dut.store_wstrb, dut.store_data);
     checks++;
   endtask  // Automatic
 
