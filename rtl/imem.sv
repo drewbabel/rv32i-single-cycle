@@ -9,6 +9,10 @@ module imem #(
 
   logic [XLEN-1:0] mem[DEPTH];
 
+`ifdef IMEM_INIT
+  initial $readmemh(`IMEM_INIT, mem);
+`endif
+
   // 2 bits = divide by 4
   assign instr = mem[addr[AddrWidth+1:2]];
 
