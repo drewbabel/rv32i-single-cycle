@@ -166,75 +166,88 @@ module rvfi_wrapper (
   assign rvfi_pc_rdata = ret_pc;
   assign rvfi_pc_wdata = pc;
 
-  wire csr_op = ret_instr[6:0] == 7'b1110011 && ret_instr[14:12] != 3'b000;
+  logic csr_op;
+  assign csr_op = ret_instr[6:0] == 7'b1110011 && ret_instr[14:12] != 3'b000;
 
 `ifdef RISCV_FORMAL_CSR_MSCRATCH
-  wire is_mscratch = csr_op && ret_instr[31:20] == 12'h340;
+  logic is_mscratch;
+  assign is_mscratch = csr_op && ret_instr[31:20] == 12'h340;
   assign rvfi_csr_mscratch_rmask = is_mscratch ? 32'hFFFFFFFF : 32'd0;
   assign rvfi_csr_mscratch_wmask = (ret_mscratch != dbg_mscratch) ? 32'hFFFFFFFF : (is_mscratch ? 32'hFFFFFFFF : 32'd0);
   assign rvfi_csr_mscratch_rdata = ret_mscratch;
   assign rvfi_csr_mscratch_wdata = dbg_mscratch;
 `endif
 `ifdef RISCV_FORMAL_CSR_MSTATUS
-  wire is_mstatus = csr_op && ret_instr[31:20] == 12'h300;
+  logic is_mstatus;
+  assign is_mstatus = csr_op && ret_instr[31:20] == 12'h300;
   assign rvfi_csr_mstatus_rmask = is_mstatus ? 32'hFFFFFFFF : 32'd0;
   assign rvfi_csr_mstatus_wmask = (ret_mstatus != dbg_mstatus) ? 32'hFFFFFFFF : (is_mstatus ? 32'hFFFFFFFF : 32'd0);
   assign rvfi_csr_mstatus_rdata = ret_mstatus;
   assign rvfi_csr_mstatus_wdata = dbg_mstatus;
 `endif
 `ifdef RISCV_FORMAL_CSR_MTVEC
-  wire is_mtvec = csr_op && ret_instr[31:20] == 12'h305;
+  logic is_mtvec;
+  assign is_mtvec = csr_op && ret_instr[31:20] == 12'h305;
   assign rvfi_csr_mtvec_rmask = is_mtvec ? 32'hFFFFFFFF : 32'd0;
   assign rvfi_csr_mtvec_wmask = (ret_mtvec != dbg_mtvec) ? 32'hFFFFFFFF : (is_mtvec ? 32'hFFFFFFFF : 32'd0);
   assign rvfi_csr_mtvec_rdata = ret_mtvec;
   assign rvfi_csr_mtvec_wdata = dbg_mtvec;
 `endif
 `ifdef RISCV_FORMAL_CSR_MEPC
-  wire is_mepc = csr_op && ret_instr[31:20] == 12'h341;
+  logic is_mepc;
+  assign is_mepc = csr_op && ret_instr[31:20] == 12'h341;
   assign rvfi_csr_mepc_rmask = is_mepc ? 32'hFFFFFFFF : 32'd0;
   assign rvfi_csr_mepc_wmask = (ret_mepc != dbg_mepc) ? 32'hFFFFFFFF : (is_mepc ? 32'hFFFFFFFF : 32'd0);
   assign rvfi_csr_mepc_rdata = ret_mepc;
   assign rvfi_csr_mepc_wdata = dbg_mepc;
 `endif
 `ifdef RISCV_FORMAL_CSR_MCAUSE
-  wire is_mcause = csr_op && ret_instr[31:20] == 12'h342;
+  logic is_mcause;
+  assign is_mcause = csr_op && ret_instr[31:20] == 12'h342;
   assign rvfi_csr_mcause_rmask = is_mcause ? 32'hFFFFFFFF : 32'd0;
   assign rvfi_csr_mcause_wmask = (ret_mcause != dbg_mcause) ? 32'hFFFFFFFF : (is_mcause ? 32'hFFFFFFFF : 32'd0);
   assign rvfi_csr_mcause_rdata = ret_mcause;
   assign rvfi_csr_mcause_wdata = dbg_mcause;
 `endif
 `ifdef RISCV_FORMAL_CSR_MTVAL
-  wire is_mtval = csr_op && ret_instr[31:20] == 12'h343;
+  logic is_mtval;
+  assign is_mtval = csr_op && ret_instr[31:20] == 12'h343;
   assign rvfi_csr_mtval_rmask = is_mtval ? 32'hFFFFFFFF : 32'd0;
   assign rvfi_csr_mtval_wmask = (ret_mtval != dbg_mtval) ? 32'hFFFFFFFF : (is_mtval ? 32'hFFFFFFFF : 32'd0);
   assign rvfi_csr_mtval_rdata = ret_mtval;
   assign rvfi_csr_mtval_wdata = dbg_mtval;
 `endif
 `ifdef RISCV_FORMAL_CSR_MIE
-  wire is_mie = csr_op && ret_instr[31:20] == 12'h304;
+  logic is_mie;
+  assign is_mie = csr_op && ret_instr[31:20] == 12'h304;
   assign rvfi_csr_mie_rmask = is_mie ? 32'hFFFFFFFF : 32'd0;
   assign rvfi_csr_mie_wmask = (ret_mie != dbg_mie) ? 32'hFFFFFFFF : (is_mie ? 32'hFFFFFFFF : 32'd0);
   assign rvfi_csr_mie_rdata = ret_mie;
   assign rvfi_csr_mie_wdata = dbg_mie;
 `endif
 `ifdef RISCV_FORMAL_CSR_MIP
-  wire is_mip = csr_op && ret_instr[31:20] == 12'h344;
+  logic is_mip;
+  assign is_mip = csr_op && ret_instr[31:20] == 12'h344;
   assign rvfi_csr_mip_rmask = is_mip ? 32'hFFFFFFFF : 32'd0;
   assign rvfi_csr_mip_wmask = (ret_mip != dbg_mip) ? 32'hFFFFFFFF : (is_mip ? 32'hFFFFFFFF : 32'd0);
   assign rvfi_csr_mip_rdata = ret_mip;
   assign rvfi_csr_mip_wdata = dbg_mip;
 `endif
 `ifdef RISCV_FORMAL_CSR_MCYCLE
-  wire is_mcycle_lo = csr_op && ret_instr[31:20] == 12'hB00;
-  wire is_mcycle_hi = csr_op && ret_instr[31:20] == 12'hB80;
+  logic is_mcycle_lo;
+  assign is_mcycle_lo = csr_op && ret_instr[31:20] == 12'hB00;
+  logic is_mcycle_hi;
+  assign is_mcycle_hi = csr_op && ret_instr[31:20] == 12'hB80;
   assign rvfi_csr_mcycle_rmask = {is_mcycle_hi ? 32'hFFFFFFFF : 32'd0, is_mcycle_lo ? 32'hFFFFFFFF : 32'd0};
   assign rvfi_csr_mcycle_wmask = {is_mcycle_hi ? 32'hFFFFFFFF : 32'd0, is_mcycle_lo ? 32'hFFFFFFFF : 32'd0};
   assign rvfi_csr_mcycle_rdata = {ret_mcycleh, ret_mcycle};
   assign rvfi_csr_mcycle_wdata = {dbg_mcycleh, dbg_mcycle};
 `endif
 `ifdef RISCV_FORMAL_CSR_MINSTRET
-  wire is_minstret_lo = csr_op && ret_instr[31:20] == 12'hB02;
-  wire is_minstret_hi = csr_op && ret_instr[31:20] == 12'hB82;
+  logic is_minstret_lo;
+  assign is_minstret_lo = csr_op && ret_instr[31:20] == 12'hB02;
+  logic is_minstret_hi;
+  assign is_minstret_hi = csr_op && ret_instr[31:20] == 12'hB82;
   assign rvfi_csr_minstret_rmask = {is_minstret_hi ? 32'hFFFFFFFF : 32'd0, is_minstret_lo ? 32'hFFFFFFFF : 32'd0};
   assign rvfi_csr_minstret_wmask = {is_minstret_hi ? 32'hFFFFFFFF : 32'd0, is_minstret_lo ? 32'hFFFFFFFF : 32'd0};
   assign rvfi_csr_minstret_rdata = {ret_minstreth, ret_minstret};
