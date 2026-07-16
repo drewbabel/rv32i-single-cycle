@@ -17,10 +17,11 @@ module tick_gen_tb ();
   tick_gen #(
       .DIVISOR(DIVISOR)
   ) dut (
-      .clk  (clk),
+      .clk(clk),
+      .core_en(1'b1),
       .rst_n(rst_n),
-      .clr  (clr),
-      .tick (tick)
+      .clr(clr),
+      .tick(tick)
   );
 
   task automatic do_reset();

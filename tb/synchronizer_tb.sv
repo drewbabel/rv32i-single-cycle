@@ -11,8 +11,9 @@ module synchronizer_tb ();
 
   synchronizer dut (
       .clk(clk),
-      .d  (d),
-      .q  (q)
+      .core_en(1'b1),
+      .d(d),
+      .q(q)
   );
 
   logic d1;

@@ -8,14 +8,17 @@ module clint_tb;
   logic            clk = 0;
   logic            rst_n;
   logic            sel;
-  logic      [3:0] wstrb;
+  logic [     3:0] wstrb;
   logic [Xlen-1:0] addr;
   logic [Xlen-1:0] wdata;
   logic [Xlen-1:0] rdata;
   logic            timer_irq;
 
-  clint #(.XLEN(Xlen)) dut (
+  clint #(
+      .XLEN(Xlen)
+  ) dut (
       .clk      (clk),
+      .core_en  (1'b1),
       .rst_n    (rst_n),
       .sel      (sel),
       .wstrb    (wstrb),
@@ -50,8 +53,7 @@ module clint_tb;
     wstrb = 0;
   endtask
 
-  task automatic check(input string name, input logic [Xlen-1:0] got,
-                       input logic [Xlen-1:0] exp);
+  task automatic check(input string name, input logic [Xlen-1:0] got, input logic [Xlen-1:0] exp);
     checks++;
     if (got !== exp) begin
       errors++;

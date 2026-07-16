@@ -39,6 +39,7 @@ module uart_rx_tb ();
       .DATA_BITS  (DataBits)
   ) dut (
       .clk(clk),
+      .core_en(1'b1),
       .rst_n(rst_n),
       .rx_serial(rx_serial),
       .rx_data(rx_data),

@@ -38,6 +38,7 @@ module csr_tb;
       .XLEN(Xlen)
   ) dut (
       .clk                 (clk),
+      .core_en             (1'b1),
       .rst_n               (rst_n),
       .csr_access          (csr_access),
       .csr_addr            (csr_addr),
