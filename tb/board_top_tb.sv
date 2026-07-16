@@ -1,7 +1,7 @@
 module board_top_tb ();
 
-  int checks = 0;
-  int errors = 0;
+  int          checks = 0;
+  int          errors = 0;
 
   logic        clk = 1'b0;
   logic        rst;
@@ -10,12 +10,21 @@ module board_top_tb ();
   logic        uart_rx = 1'b1;
   logic        uart_tx;
 
-  // uart_rx bit period
-  localparam int ClksPerBit = 16 * (((12_500_000 + 115_200 / 2) / 115_200 + 8) / 16);
+  localparam int FastClkHz = 100_000_000;
+  localparam int ClkDiv = 32;
+  localparam int CoreClkHz = FastClkHz / ClkDiv;
+  localparam int BaudRate = 28_800;
+
+  // Bit period in fast clocks, core samples at CoreClkHz
+  localparam int ClksPerBit = (FastClkHz + BaudRate / 2) / BaudRate;
+
+  logic [31:0] prog[8];
 
   always #5 clk = ~clk;
 
-  board_top dut (
+  board_top #(
+      .DEPTH(1024)
+  ) dut (
       .clk    (clk),
       .rst    (rst),
       .sw     (sw),
@@ -26,10 +35,11 @@ module board_top_tb ();
 
   task automatic do_reset();
     rst = 1;
-    sw  = 16'h0;
+    sw = 16'h0;
     uart_rx = 1'b1;
     repeat (2) @(posedge clk);
     rst = 0;
+    repeat (200) @(posedge clk);
   endtask  // Automatic
 
   task automatic send_byte(input logic [7:0] b);
@@ -41,6 +51,10 @@ module board_top_tb ();
     end
     uart_rx = 1'b1;
     repeat (ClksPerBit) @(posedge clk);
+  endtask  // Automatic
+
+  task automatic send_word(input logic [31:0] w);
+    for (int j = 0; j < 32; j += 8) send_byte(w[j+:8]);
   endtask  // Automatic
 
   task automatic check(input string name, input logic [15:0] got, input logic [15:0] exp);
@@ -57,21 +71,18 @@ module board_top_tb ();
     $finish;
   endtask  // Automatic
 
-  // gpio_test writes 0xABCD to LEDs
+  // Round-trip a word through mem to the LEDs
   initial begin
     $dumpfile("tb.vcd");
     $dumpvars(0, board_top_tb);
+    $readmemh("tests/memtest.hex", prog);
     do_reset();
 
-    send_byte(8'd5);
-    send_byte(8'hB7); send_byte(8'h00); send_byte(8'h00); send_byte(8'h03);
-    send_byte(8'h37); send_byte(8'hB1); send_byte(8'h00); send_byte(8'h00);
-    send_byte(8'h13); send_byte(8'h01); send_byte(8'hD1); send_byte(8'hBC);
-    send_byte(8'h23); send_byte(8'hA0); send_byte(8'h20); send_byte(8'h00);
-    send_byte(8'h6F); send_byte(8'h00); send_byte(8'h00); send_byte(8'h00);
+    send_word(32'd8);
+    foreach (prog[i]) send_word(prog[i]);
 
     wait (dut.loading == 1'b0);
-    repeat (20) @(posedge clk);
+    repeat (200) @(posedge clk);
     check("led", led, 16'hABCD);
     verdict();
   end
