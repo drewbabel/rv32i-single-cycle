@@ -5,6 +5,7 @@ module uart_rx #(
     parameter int DATA_BITS   = 8
 ) (
     input logic clk,
+    input logic core_en,
     input logic rst_n,
     input logic rx_serial,
     output logic [DATA_BITS-1:0] rx_data,
@@ -33,58 +34,61 @@ module uart_rx #(
 
   synchronizer sync_FF (
       .clk(clk),
-      .d  (rx_serial),
-      .q  (in)
+      .core_en(core_en),
+      .d(rx_serial),
+      .q(in)
   );
 
   tick_gen #(
       .DIVISOR(ClksPerOversample)
   ) oversample_tick (
-      .clk  (clk),
+      .clk(clk),
+      .core_en(core_en),
       .rst_n(rst_n),
-      .clr  (tick_clr),
-      .tick (tick)
+      .clr(tick_clr),
+      .tick(tick)
   );
 
-  always_ff @(posedge clk) begin
-    rx_valid <= 1'b0;
-    rx_error <= 1'b0;
-    if (!rst_n) begin
-      state <= IDLE;
-      tick_cnt <= '0;
-      data_cnt <= '0;
-    end else begin
-      state   <= next_state;
-      in_prev <= in;
-
-      // Result Pulse
-      if (state == RESULT && next_state == IDLE) begin
-        rx_valid <= in;
-        rx_error <= !in;
-      end
-
-      // Counter logic
-      if (tick) begin
-        if (tick_cnt == $bits(tick_cnt)'(OVERSAMPLE - 1)) begin
-          tick_cnt <= '0;
-
-          // Bit boundary
-          case (state)
-            DATA: begin
-              data_cnt <= data_cnt + 1'b1;
-              rx_data <= {in, rx_data[DATA_BITS-1:1]};
-            end
-            default: data_cnt <= '0;
-          endcase
-        end else tick_cnt <= tick_cnt + 1'b1;
-      end
-
-      if (tick_clr) begin
+  always_ff @(posedge clk)
+    if (core_en) begin
+      rx_valid <= 1'b0;
+      rx_error <= 1'b0;
+      if (!rst_n) begin
+        state <= IDLE;
         tick_cnt <= '0;
         data_cnt <= '0;
+      end else begin
+        state   <= next_state;
+        in_prev <= in;
+
+        // Result Pulse
+        if (state == RESULT && next_state == IDLE) begin
+          rx_valid <= in;
+          rx_error <= !in;
+        end
+
+        // Counter logic
+        if (tick) begin
+          if (tick_cnt == $bits(tick_cnt)'(OVERSAMPLE - 1)) begin
+            tick_cnt <= '0;
+
+            // Bit boundary
+            case (state)
+              DATA: begin
+                data_cnt <= data_cnt + 1'b1;
+                rx_data  <= {in, rx_data[DATA_BITS-1:1]};
+              end
+              default: data_cnt <= '0;
+            endcase
+          end else tick_cnt <= tick_cnt + 1'b1;
+        end
+
+        if (tick_clr) begin
+          tick_cnt <= '0;
+          data_cnt <= '0;
+        end
       end
     end
-  end
 
   always_comb begin
     tick_clr   = 1'b0;
@@ -94,7 +98,7 @@ module uart_rx #(
       IDLE: begin
         if (in_prev && !in) begin
           next_state = START;
-          tick_clr = 1'b1;
+          tick_clr   = 1'b1;
         end
       end
 
@@ -102,7 +106,7 @@ module uart_rx #(
         if (!in) begin
           if (tick_cnt == $bits(tick_cnt)'(OVERSAMPLE / 2)) begin
             next_state = DATA;
-            tick_clr = 1'b1;
+            tick_clr   = 1'b1;
           end
         end else next_state = IDLE;
       end
@@ -110,7 +114,7 @@ module uart_rx #(
       DATA: begin
         if (data_cnt == $bits(data_cnt)'(DATA_BITS)) begin
           next_state = RESULT;
-          tick_clr = 1'b1;
+          tick_clr   = 1'b1;
         end
       end
 

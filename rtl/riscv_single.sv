@@ -5,6 +5,7 @@ module riscv_single
     parameter int XLEN = 32
 ) (
     input  logic            clk,
+    input  logic            core_en,
     input  logic            rst_n,
     input  logic [XLEN-1:0] instr,
     input  logic [XLEN-1:0] read_data,
@@ -140,6 +141,7 @@ module riscv_single
       .XLEN(XLEN)
   ) csr_inst (
       .clk                 (clk),
+      .core_en             (core_en),
       .rst_n               (rst_n),
       .csr_access          (csr_access),
       .csr_addr            (funct12),
@@ -185,6 +187,7 @@ module riscv_single
       .XLEN(XLEN)
   ) datapath_inst (
       .clk          (clk),
+      .core_en      (core_en),
       .rst_n        (rst_n),
       .reg_write    (reg_write_gated),
       .imm_src      (imm_src),

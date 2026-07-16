@@ -3,16 +3,17 @@ module clint
 #(
     parameter int XLEN = 32
 ) (
-    input  logic            clk,
-    input  logic            rst_n,
+    input logic clk,
+    input logic core_en,
+    input logic rst_n,
 
     input  logic            sel,
-    input  logic      [3:0] wstrb,
+    input  logic [     3:0] wstrb,
     input  logic [XLEN-1:0] addr,
     input  logic [XLEN-1:0] wdata,
     output logic [XLEN-1:0] rdata,
 
-    output logic            timer_irq
+    output logic timer_irq
 );
 
   logic [63:0] mtime;
@@ -44,7 +45,7 @@ module clint
     if (!rst_n) begin
       mtime    <= '0;
       mtimecmp <= '1;  // never fire until software programs it
-    end else begin
+    end else if (core_en) begin
       mtime <= mtime + 1;
       if (sel && |wstrb) begin
         case (off)

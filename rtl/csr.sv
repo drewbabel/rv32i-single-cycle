@@ -4,6 +4,7 @@ module csr
     parameter int XLEN = 32
 ) (
     input logic clk,
+    input logic core_en,
     input logic rst_n,
 
     // Zicsr access
@@ -120,7 +121,7 @@ module csr
       minstret <= '0;
       mcycleh   <= '0;
       minstreth <= '0;
-    end else begin
+    end else if (core_en) begin
       mcycle    <= mcycle + 1;
       mcycleh   <= (mcycle == '1) ? mcycleh + 1 : mcycleh;
       minstret  <= minstret + 1;
@@ -152,6 +153,9 @@ module csr
           mcause <= {1'b1, 31'(CauseMachineTimerIrq)};
           mtval  <= '0;
         end
+      end else if (is_mret) begin
+        mstatus[MstatusMie]  <= mstatus[MstatusMpie];
+        mstatus[MstatusMpie] <= 1'b1;
       end
 
       if (csr_access) begin
