@@ -39,8 +39,6 @@ package csr_pkg;
   // mcause interrupt code (mcause[XLEN-1] set)
   localparam logic [3:0] CauseMachineTimerIrq = 4'd7;
 
-  localparam logic [6:0] OpcodeSystem = 7'b1110011;
-
   // funct3, Priv = ecall/ebreak/mret
   localparam logic [2:0] Funct3Priv = 3'b000;
   localparam logic [2:0] Funct3Csrrw = 3'b001;
