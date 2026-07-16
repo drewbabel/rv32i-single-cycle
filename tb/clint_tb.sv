@@ -86,6 +86,22 @@ module clint_tb;
     #1;
     check("irq_after_compare", timer_irq, 32'd1);
 
+    #1;
+    sel   = 1;
+    wstrb = 4'b0010;  // lane 1 only
+    addr  = 32'h0000_4000;
+    wdata = 32'h0000_AA00;
+    @(posedge clk);
+    #1;
+    sel   = 0;
+    wstrb = 0;
+    #1;
+    sel  = 1;
+    addr = 32'h0000_4000;
+    #1;
+    check("mtimecmp_byte_write", rdata, 32'h0000_AA32);
+    sel = 0;
+
     if (errors == 0) $display("PASS: %0d checks, %0d mismatches", checks, errors);
     else $fatal(1, "FAIL: %0d mismatches, %0d checks", errors, checks);
     $finish;
