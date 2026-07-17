@@ -86,7 +86,9 @@ A store to the transmit register sends one byte, and polling the ready register 
 
 CoreMark runs on the core as a bare-metal program, timed by the `mcycle` counter and printing its report over the serial transmitter. The port links against the soft-multiply routines in libgcc, since the base integer core carries no hardware multiply.
 
-The core retires one iteration in `718010` cycles, a score of 1.39 CoreMark per MHz measured in simulation. The single-cycle datapath spends the same cycles on every iteration, so the CoreMark per MHz carries to the board, where the raw score scales with the core clock.
+The core retires one iteration in `718010` cycles, a score of 1.39 CoreMark per MHz in simulation. Because the single-cycle datapath spends the same cycles on every iteration, the CoreMark per MHz is fixed by the datapath rather than the workload.
+
+On the Basys 3 the benchmark auto-calibrates to 60 iterations and runs for 13.786 seconds at the 3.125 MHz core clock, scoring 4.35 iterations per second. The board result holds at 1.39 CoreMark per MHz and validates against the reference CRCs, matching simulation.
 
 ## Verification
 
