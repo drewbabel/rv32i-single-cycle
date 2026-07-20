@@ -27,6 +27,7 @@ sv2v -D RISCV_FORMAL "${SRC[@]}" > "$DST/$CORE.v"
 
 cd "$DST"
 python3 "$RVF/checks/genchecks.py" >&2
+ls checks/*.sby | grep -v cover.sby | xargs perl -i -pe 's/smtbmc yices/btor btormc/'
 
 if [ "${1:-}" = "--list" ]; then
   ls checks/*.sby | xargs -n1 basename | sed 's/\.sby$//'
