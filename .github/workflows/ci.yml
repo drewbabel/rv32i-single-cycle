@@ -3,8 +3,25 @@ name: CI
 on: [push, pull_request]
 
 jobs:
-  testbenches:
+  testbench-list:
     runs-on: ubuntu-latest
+    outputs:
+      groups: ${{ steps.list.outputs.groups }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Split testbenches into groups
+        id: list
+        run: |
+          groups=$(ls tb/*_tb.sv | sed 's#.*/##;s#_tb\.sv$##' | grep -vE '^(freertos_boot|coremark_boot|prog)$' | python3 -c "import sys, json; n=[l.strip() for l in sys.stdin if l.strip()]; g=[[] for _ in range(4)]; [g[i % 4].append(x) for i, x in enumerate(n)]; print(json.dumps([' '.join(x) for x in g if x]))")
+          echo "groups=$groups" >> "$GITHUB_OUTPUT"
+
+  testbenches:
+    needs: testbench-list
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        group: ${{ fromJSON(needs.testbench-list.outputs.groups) }}
     steps:
       - uses: actions/checkout@v4
       - name: Install Icarus Verilog
@@ -12,16 +29,9 @@ jobs:
           sudo grep -rlZ packages.microsoft.com /etc/apt/sources.list.d/ 2>/dev/null | sudo xargs -0 -r rm -f
           sudo apt-get update
           sudo apt-get install -y iverilog
-      - name: Run every module testbench
+      - name: Run the testbench group
         run: |
-          shopt -s nullglob
-          for tb in tb/*_tb.sv; do
-            mod=$(basename "$tb" _tb.sv)
-            case "$mod" in
-              freertos_boot) echo "== skip $mod (needs FreeRTOS image) =="; continue;;
-              coremark_boot) echo "== skip $mod (needs CoreMark image) =="; continue;;
-              prog) echo "== skip $mod (driven by the selfcheck job) =="; continue;;
-            esac
+          for mod in ${{ matrix.group }}; do
             echo "== $mod =="
             make MOD="$mod"
           done
@@ -195,11 +205,11 @@ jobs:
 
   ci-gate:
     if: always()
-    needs: [testbenches, selfcheck, formal, core-formal-list, core-formal, cosim, freertos, coremark]
+    needs: [testbench-list, testbenches, selfcheck, formal, core-formal-list, core-formal, cosim, freertos, coremark]
     runs-on: ubuntu-latest
     steps:
       - name: Verify all CI jobs succeeded
-        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}
         run: |
           echo "One or more required CI jobs did not succeed."
           exit 1
