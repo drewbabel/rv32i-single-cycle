@@ -16,6 +16,52 @@ The design, testbenches, formal proofs, co-simulation harness, and FreeRTOS port
 
 ![Single-cycle datapath block diagram](docs/datapath_block.svg)
 
+## CoreMark
+
+CoreMark runs on the core as a bare-metal program, timed by the `mcycle` counter and printing its report over the serial transmitter. The port links against the soft-multiply routines in libgcc, since the base integer core carries no hardware multiply.
+
+The core retires one iteration in `718010` cycles, a score of 1.39 CoreMark per MHz in simulation. Because the single-cycle datapath spends the same cycles on every iteration, the CoreMark per MHz is fixed by the datapath rather than the workload.
+
+On the Basys 3 the benchmark auto-calibrates to 60 iterations and runs for 13.786 seconds at the 3.125 MHz core clock, scoring 4.35 iterations per second. The board result holds at 1.39 CoreMark per MHz and validates against the reference CRCs, matching simulation.
+
+## Verification
+
+The riscv-formal proof wraps `riscv_single` in the RISC-V Formal Interface and checks every retired instruction against the RISC-V specification under SymbiYosys, including the machine-mode traps, the Zicsr read and write path, and the misaligned instruction, load, and store cases. Run the proof with `bash formal/rvfi/run.sh`.
+
+The riscv-formal wrapper ties the timer interrupt low, so a separate proof, `formal/irq.sby`, drives it free over the `csr` trap logic and proves the interrupt path by k-induction. It shows that an interrupt is taken only when it is pending with both `mstatus.MIE` and `mie.MTIE` set, that it is never taken while masked, that a simultaneous exception outranks it, that `mepc`, `mcause`, and `mstatus.MPIE` are correct on entry, and that `mret` restores `MIE` from `MPIE`. Run it with `make formal MOD=irq`.
+
+Spike lockstep co-simulation runs the core against the Spike reference simulator and compares the register and memory write of every retired instruction. Beyond hand-written programs, a randomized program generator feeds the same lockstep check with byte, halfword, and word accesses, a differential test against the golden model that reaches sequences the directed programs miss.
+
+The `alu` carries an exhaustive SymbiYosys proof that its `result`, `zero`, `lt`, and `ltu` match an independent reference model over the full input space, and every module has a self-checking testbench, with the `csr`, `clint`, and timer paths driven through directed trap sequences.
+
+The full system runs on a Basys 3, where the FreeRTOS demo drives the trap, timer, and byte-lane memory paths on real hardware. `tb/freertos_boot_tb.sv` reproduces the boot in simulation, and `tb/memcheck_boot_tb.sv` runs a 2000-word store and read-back stress test.
+
+## Results
+
+![Arithmetic program waveform](docs/program_waveform.svg)
+
+![Branch loop waveform](docs/loop_waveform.svg)
+
+A timer interrupt fires once `mtime` reaches `mtimecmp`, redirecting the core to the `mtvec` handler and returning through `mret`.
+
+![Machine timer trap waveform](docs/trap_waveform.svg)
+
+## Instructions
+
+| Format | Instructions |
+|--------|--------------|
+| Register (`OP`) | `add` `sub` `sll` `slt` `sltu` `xor` `srl` `sra` `or` `and` |
+| Immediate (`OP-IMM`) | `addi` `slti` `sltiu` `xori` `ori` `andi` `slli` `srli` `srai` |
+| Load (`LOAD`) | `lb` `lbu` `lh` `lhu` `lw` |
+| Store (`STORE`) | `sb` `sh` `sw` |
+| Branch (`BRANCH`) | `beq` `bne` `blt` `bge` `bltu` `bgeu` |
+| Jump | `jal` `jalr` |
+| Upper immediate | `lui` `auipc` |
+| System | `ecall` `ebreak` `mret` |
+| Zicsr | `csrrw` `csrrs` `csrrc` `csrrwi` `csrrsi` `csrrci` |
+
+The `FENCE` instruction is a no-op, and the core runs entirely in machine mode.
+
 ## Parameters
 
 | Parameter | Default | Description |
@@ -34,22 +80,6 @@ The design, testbenches, formal proofs, co-simulation harness, and FreeRTOS port
 | `alu_result` | out | `XLEN` | ALU output, also the data memory address |
 | `write_data` | out | `XLEN` | Store data driven to data memory |
 | `mem_write` | out | 1 | Data memory write strobe |
-
-## Instructions
-
-| Format | Instructions |
-|--------|--------------|
-| Register (`OP`) | `add` `sub` `sll` `slt` `sltu` `xor` `srl` `sra` `or` `and` |
-| Immediate (`OP-IMM`) | `addi` `slti` `sltiu` `xori` `ori` `andi` `slli` `srli` `srai` |
-| Load (`LOAD`) | `lb` `lbu` `lh` `lhu` `lw` |
-| Store (`STORE`) | `sb` `sh` `sw` |
-| Branch (`BRANCH`) | `beq` `bne` `blt` `bge` `bltu` `bgeu` |
-| Jump | `jal` `jalr` |
-| Upper immediate | `lui` `auipc` |
-| System | `ecall` `ebreak` `mret` |
-| Zicsr | `csrrw` `csrrs` `csrrc` `csrrwi` `csrrsi` `csrrci` |
-
-The `FENCE` instruction is a no-op, and the core runs entirely in machine mode.
 
 ## Machine mode
 
@@ -81,36 +111,6 @@ The core traps illegal instructions, `ecall`, `ebreak`, and misaligned instructi
 | UART transmit ready | `0x0400_0004` | read |
 
 A store to the transmit register sends one byte, and polling the ready register before each store lets a program print over the serial line. The transmitter is the formally proven `uart_tx` from the standalone UART project, reused here behind the register interface.
-
-## CoreMark
-
-CoreMark runs on the core as a bare-metal program, timed by the `mcycle` counter and printing its report over the serial transmitter. The port links against the soft-multiply routines in libgcc, since the base integer core carries no hardware multiply.
-
-The core retires one iteration in `718010` cycles, a score of 1.39 CoreMark per MHz in simulation. Because the single-cycle datapath spends the same cycles on every iteration, the CoreMark per MHz is fixed by the datapath rather than the workload.
-
-On the Basys 3 the benchmark auto-calibrates to 60 iterations and runs for 13.786 seconds at the 3.125 MHz core clock, scoring 4.35 iterations per second. The board result holds at 1.39 CoreMark per MHz and validates against the reference CRCs, matching simulation.
-
-## Verification
-
-The riscv-formal proof wraps `riscv_single` in the RISC-V Formal Interface and checks every retired instruction against the RISC-V specification under SymbiYosys, including the machine-mode traps, the Zicsr read and write path, and the misaligned instruction, load, and store cases. Run the proof with `bash formal/rvfi/run.sh`.
-
-The riscv-formal wrapper ties the timer interrupt low, so a separate proof, `formal/irq.sby`, drives it free over the `csr` trap logic and proves the interrupt path by k-induction. It shows that an interrupt is taken only when it is pending with both `mstatus.MIE` and `mie.MTIE` set, that it is never taken while masked, that a simultaneous exception outranks it, that `mepc`, `mcause`, and `mstatus.MPIE` are correct on entry, and that `mret` restores `MIE` from `MPIE`. Run it with `make formal MOD=irq`.
-
-Spike lockstep co-simulation runs the core against the Spike reference simulator and compares the register and memory write of every retired instruction. Beyond hand-written programs, a randomized program generator feeds the same lockstep check with byte, halfword, and word accesses, a differential test against the golden model that reaches sequences the directed programs miss.
-
-The `alu` carries an exhaustive SymbiYosys proof that its `result`, `zero`, `lt`, and `ltu` match an independent reference model over the full input space, and every module has a self-checking testbench, with the `csr`, `clint`, and timer paths driven through directed trap sequences.
-
-The full system runs on a Basys 3, where the FreeRTOS demo drives the trap, timer, and byte-lane memory paths on real hardware. `tb/freertos_boot_tb.sv` reproduces the boot in simulation, and `tb/memcheck_boot_tb.sv` runs a 2000-word store and read-back stress test.
-
-## Results
-
-![Arithmetic program waveform](docs/program_waveform.svg)
-
-![Branch loop waveform](docs/loop_waveform.svg)
-
-A timer interrupt fires once `mtime` reaches `mtimecmp`, redirecting the core to the `mtvec` handler and returning through `mret`.
-
-![Machine timer trap waveform](docs/trap_waveform.svg)
 
 ## Building and running
 
